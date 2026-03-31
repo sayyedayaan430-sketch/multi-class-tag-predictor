@@ -1,0 +1,132 @@
+"""
+predict.py
+──────────
+Loads trained model artifacts and runs predictions on new text input.
+
+Usage (command line):
+    python predict.py --text "How do I sort a list in Python?"
+    python predict.py --text "What is a neural network?" --top_n 3
+
+Usage (as a module):
+    from predict import predict_tags
+    tags = predict_tags("How do I sort a list in Python?")
+"""
+
+import pickle
+import argparse
+import os
+
+from preprocess import clean_text
+
+# ─── Paths to saved model artifacts ───────────────────────────────────────────
+MODEL_PATH = '../models/tag_model.pkl'
+TFIDF_PATH = '../models/tfidf.pkl'
+MLB_PATH   = '../models/mlb.pkl'
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Cache loaded artifacts so we don't reload on every call
+_cache = {}
+
+
+def load_artifacts() -> tuple:
+    """
+    Load model, TF-IDF vectorizer, and MultiLabelBinarizer from disk.
+    Uses an in-memory cache to avoid reloading on repeated calls.
+
+    Returns:
+        tuple: (model, tfidf, mlb)
+
+    Raises:
+        FileNotFoundError: If model files are missing (run train.py first)
+    """
+    if _cache:
+        return _cache['model'], _cache['tfidf'], _cache['mlb']
+
+    for path in [MODEL_PATH, TFIDF_PATH, MLB_PATH]:
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                f"Model artifact not found: {path}\n"
+                "Please run `python src/train.py` first to train the model."
+            )
+
+    with open(MODEL_PATH, 'rb') as f: _cache['model'] = pickle.load(f)
+    with open(TFIDF_PATH, 'rb') as f: _cache['tfidf'] = pickle.load(f)
+    with open(MLB_PATH,   'rb') as f: _cache['mlb']   = pickle.load(f)
+
+    return _cache['model'], _cache['tfidf'], _cache['mlb']
+
+
+def predict_tags(text: str,
+                 top_n: int = 5,
+                 threshold: float = 0.15) -> list[dict]:
+    """
+    Predict tags for a given input text with confidence scores.
+
+    Args:
+        text (str): Raw input text (question or article)
+        top_n (int): Maximum number of tags to return (default: 5)
+        threshold (float): Minimum confidence score for a tag to be included (default: 0.15)
+
+    Returns:
+        list[dict]: List of dicts with 'tag' and 'confidence' keys,
+                    sorted by confidence descending.
+                    e.g. [{'tag': 'python', 'confidence': 0.92}, ...]
+    """
+    model, tfidf, mlb = load_artifacts()
+
+    # Clean and vectorize input text
+    cleaned = clean_text(text)
+    X = tfidf.transform([cleaned])
+
+    # Get probability scores for each tag class
+    probs = model.predict_proba(X)[0]   # shape: (n_classes,)
+
+    # Pair each tag with its probability score, then sort descending
+    tag_scores = sorted(
+        zip(mlb.classes_, probs),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    # Filter by threshold and take top_n
+    results = [
+        {'tag': tag, 'confidence': round(float(score), 4)}
+        for tag, score in tag_scores[:top_n]
+        if score >= threshold
+    ]
+
+    return results
+
+
+# ── Command-line interface ─────────────────────────────────────────────────────
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='Predict tags for a given text input'
+    )
+    parser.add_argument(
+        '--text', type=str, required=True,
+        help='Input text to predict tags for'
+    )
+    parser.add_argument(
+        '--top_n', type=int, default=5,
+        help='Maximum number of tags to return (default: 5)'
+    )
+    parser.add_argument(
+        '--threshold', type=float, default=0.15,
+        help='Minimum confidence threshold (default: 0.15)'
+    )
+    args = parser.parse_args()
+
+    print(f"\nInput : {args.text}")
+    print("─" * 50)
+
+    predictions = predict_tags(args.text, top_n=args.top_n, threshold=args.threshold)
+
+    if predictions:
+        print(f"{'Tag':<25} {'Confidence':>10}")
+        print("─" * 35)
+        for p in predictions:
+            bar = '█' * int(p['confidence'] * 20)
+            print(f"  {p['tag']:<23} {p['confidence']:>6.1%}  {bar}")
+    else:
+        print("No tags predicted above the confidence threshold.")
