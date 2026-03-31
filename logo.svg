@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <!-- Background circle -->
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d1117;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#161b22;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#238636;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2ea043;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1f6feb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#388bfd;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Outer dark circle -->
+  <circle cx="200" cy="200" r="195" fill="url(#bgGrad)" stroke="#30363d" stroke-width="2"/>
+
+  <!-- Decorative ring -->
+  <circle cx="200" cy="200" r="175" fill="none" stroke="#238636" stroke-width="1" stroke-dasharray="8 4" opacity="0.4"/>
+
+  <!-- Central brain/tag icon -->
+  <!-- Main tag shape -->
+  <path d="M155 130 L245 130 L280 200 L245 270 L155 270 L120 200 Z"
+        fill="url(#greenGrad)" opacity="0.15" stroke="url(#greenGrad)" stroke-width="2"/>
+
+  <!-- Inner tag shape (smaller) -->
+  <path d="M165 150 L235 150 L262 200 L235 250 L165 250 L138 200 Z"
+        fill="none" stroke="#2ea043" stroke-width="1.5" opacity="0.6"/>
+
+  <!-- Tag label icon - price tag shape -->
+  <path d="M178 172 L218 172 L238 200 L218 228 L178 228 L158 200 Z"
+        fill="url(#greenGrad)" filter="url(#glow)"/>
+
+  <!-- Hash symbol inside tag -->
+  <text x="200" y="208" text-anchor="middle" font-family="monospace" font-size="30"
+        font-weight="bold" fill="white" opacity="0.95">#</text>
+
+  <!-- Floating tag badges around center -->
+  <!-- Tag 1: python -->
+  <rect x="82" y="118" width="80" height="28" rx="14" fill="url(#blueGrad)" opacity="0.9"/>
+  <text x="122" y="137" text-anchor="middle" font-family="Arial, sans-serif"
+        font-size="13" font-weight="bold" fill="white">python</text>
+
+  <!-- Tag 2: nlp -->
+  <rect x="240" y="105" width="62" height="28" rx="14" fill="#6e40c9" opacity="0.9"/>
+  <text x="271" y="124" text-anchor="middle" font-family="Arial, sans-serif"
+        font-size="13" font-weight="bold" fill="white">nlp</text>
+
+  <!-- Tag 3: pandas -->
+  <rect x="260" y="240" width="76" height="28" rx="14" fill="url(#greenGrad)" opacity="0.9"/>
+  <text x="298" y="259" text-anchor="middle" font-family="Arial, sans-serif"
+        font-size="13" font-weight="bold" fill="white">pandas</text>
+
+  <!-- Tag 4: ml -->
+  <rect x="70" y="255" width="56" height="28" rx="14" fill="#da3633" opacity="0.9"/>
+  <text x="98" y="274" text-anchor="middle" font-family="Arial, sans-serif"
+        font-size="13" font-weight="bold" fill="white">ml</text>
+
+  <!-- Tag 5: sklearn -->
+  <rect x="290" y="175" width="76" height="26" rx="13" fill="#388bfd" opacity="0.7"/>
+  <text x="328" y="193" text-anchor="middle" font-family="Arial, sans-serif"
+        font-size="12" font-weight="bold" fill="white">sklearn</text>
+
+  <!-- Tag 6: ai -->
+  <rect x="40" y="183" width="52" height="26" rx="13" fill="#f78166" opacity="0.8"/>
+  <text x="66" y="201" text-anchor="middle" font-family="Arial, sans-serif"
+        font-size="13" font-weight="bold" fill="white">ai</text>
+
+  <!-- Connecting dots from tags to center -->
+  <line x1="162" y1="132" x2="175" y2="175" stroke="#238636" stroke-width="1"
+        stroke-dasharray="3 3" opacity="0.5"/>
+  <line x1="240" y1="119" x2="225" y2="172" stroke="#6e40c9" stroke-width="1"
+        stroke-dasharray="3 3" opacity="0.5"/>
+  <line x1="270" y1="254" x2="238" y2="228" stroke="#238636" stroke-width="1"
+        stroke-dasharray="3 3" opacity="0.5"/>
+  <line x1="115" y1="262" x2="163" y2="228" stroke="#da3633" stroke-width="1"
+        stroke-dasharray="3 3" opacity="0.5"/>
+  <line x1="290" y1="188" x2="238" y2="200" stroke="#388bfd" stroke-width="1"
+        stroke-dasharray="3 3" opacity="0.5"/>
+  <line x1="92" y1="196" x2="158" y2="200" stroke="#f78166" stroke-width="1"
+        stroke-dasharray="3 3" opacity="0.5"/>
+
+  <!-- Project name -->
+  <text x="200" y="318" text-anchor="middle" font-family="Arial, sans-serif"
+        font-size="20" font-weight="bold" fill="#ffffff" letter-spacing="1">
+    Multi-Class
+  </text>
+  <text x="200" y="343" text-anchor="middle" font-family="Arial, sans-serif"
+        font-size="20" font-weight="bold" fill="#2ea043" letter-spacing="1">
+    Tag Predictor
+  </text>
+
+  <!-- Small dots decoration -->
+  <circle cx="200" cy="365" r="3" fill="#238636" opacity="0.7"/>
+  <circle cx="215" cy="365" r="2" fill="#238636" opacity="0.4"/>
+  <circle cx="185" cy="365" r="2" fill="#238636" opacity="0.4"/>
+
+</svg>
