@@ -1,0 +1,146 @@
+"""
+preprocess.py
+─────────────
+Handles all text cleaning and preprocessing steps before feeding
+data into the machine learning pipeline.
+
+Steps:
+  1. Lowercase text
+  2. Remove special characters and digits
+  3. Tokenize
+  4. Remove stopwords
+  5. Lemmatize tokens
+  6. Rejoin into clean string
+"""
+
+import re
+import nltk
+import pandas as pd
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+
+# Download required NLTK data (runs only if not already downloaded)
+nltk.download('stopwords', quiet=True)
+nltk.download('wordnet', quiet=True)
+nltk.download('omw-1.4', quiet=True)
+
+# Initialize lemmatizer and stopword set once (reused across calls)
+lemmatizer = WordNetLemmatizer()
+STOP_WORDS = set(stopwords.words('english'))
+
+
+def clean_text(text: str) -> str:
+    """
+    Full text cleaning pipeline for a single string.
+
+    Args:
+        text (str): Raw input text
+
+    Returns:
+        str: Cleaned and lemmatized text
+
+    Example:
+        >>> clean_text("How do I merge DataFrames in Pandas?!")
+        'merge dataframe panda'
+    """
+    # Step 1: Lowercase everything
+    text = text.lower()
+
+    # Step 2: Remove URLs (http/https links)
+    text = re.sub(r'http\S+|www\S+', '', text)
+
+    # Step 3: Remove code snippets inside backticks
+    text = re.sub(r'`[^`]*`', '', text)
+
+    # Step 4: Keep only letters and spaces (remove digits, punctuation)
+    text = re.sub(r'[^a-z\s]', '', text)
+
+    # Step 5: Tokenize (split into words)
+    tokens = text.split()
+
+    # Step 6: Remove stopwords and short tokens (length < 2)
+    tokens = [t for t in tokens if t not in STOP_WORDS and len(t) > 2]
+
+    # Step 7: Lemmatize each token (e.g., "running" → "run")
+    tokens = [lemmatizer.lemmatize(t) for t in tokens]
+
+    return ' '.join(tokens)
+
+
+def parse_tags(tag_string: str) -> list:
+    """
+    Convert a raw tag string into a clean list of tag strings.
+
+    Args:
+        tag_string (str): Tags separated by spaces, commas, or pipe characters
+                          e.g. "python pandas nlp" or "python,pandas,nlp"
+
+    Returns:
+        list: List of individual tag strings
+              e.g. ['python', 'pandas', 'nlp']
+    """
+    # Split on comma, space, or pipe characters
+    tags = re.split(r'[,|\s]+', tag_string.strip())
+
+    # Lowercase and strip whitespace from each tag, filter empty strings
+    return [t.lower().strip() for t in tags if t.strip()]
+
+
+def preprocess_dataframe(df: pd.DataFrame,
+                          text_col: str = 'text',
+                          tag_col: str = 'tags') -> pd.DataFrame:
+    """
+    Apply the full preprocessing pipeline to an entire DataFrame.
+
+    Args:
+        df (pd.DataFrame): Raw input DataFrame
+        text_col (str): Name of the column containing text (default: 'text')
+        tag_col (str): Name of the column containing tags (default: 'tags')
+
+    Returns:
+        pd.DataFrame: Processed DataFrame with two new columns:
+                      - 'clean_text': cleaned version of text_col
+                      - 'tag_list':   list version of tag_col
+    """
+    df = df.copy()
+
+    # Drop rows where text or tags are missing
+    df.dropna(subset=[text_col, tag_col], inplace=True)
+
+    # Remove rows with empty strings
+    df = df[df[text_col].str.strip() != '']
+    df = df[df[tag_col].str.strip() != '']
+
+    print(f"  → Rows after cleaning: {len(df)}")
+
+    # Apply text cleaning to every row
+    df['clean_text'] = df[text_col].astype(str).apply(clean_text)
+
+    # Parse tag strings into lists
+    df['tag_list'] = df[tag_col].astype(str).apply(parse_tags)
+
+    # Drop rows where cleaning left empty text or empty tag list
+    df = df[df['clean_text'].str.strip() != '']
+    df = df[df['tag_list'].map(len) > 0]
+
+    return df.reset_index(drop=True)
+
+
+# ── Quick test when run directly ──────────────────────────────────────────────
+if __name__ == '__main__':
+    sample_data = pd.DataFrame({
+        'text': [
+            'How do I merge two DataFrames in pandas using a common column?',
+            'What is the difference between a list and a tuple in Python?',
+            'How to train a neural network with TensorFlow and Keras?',
+        ],
+        'tags': [
+            'python pandas dataframe merge',
+            'python list tuple',
+            'python tensorflow keras neural-network',
+        ]
+    })
+
+    print("─── Running preprocess test ───")
+    result = preprocess_dataframe(sample_data)
+    print(result[['clean_text', 'tag_list']].to_string())
