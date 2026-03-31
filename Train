@@ -1,0 +1,168 @@
+"""
+train.py
+────────
+Full training pipeline for the Multi-Class Tag Predictor.
+
+Pipeline:
+  1. Load raw CSV dataset
+  2. Preprocess text (clean_text) and parse tags (tag_list)
+  3. Filter out rare tags below a minimum frequency threshold
+  4. Binarize multi-labels using MultiLabelBinarizer
+  5. Vectorize text with TF-IDF (unigrams + bigrams)
+  6. Train a OneVsRest Logistic Regression classifier
+  7. Evaluate on a held-out test set
+  8. Save model artifacts (model, tfidf, mlb) as .pkl files
+"""
+
+import os
+import pickle
+import pandas as pd
+from collections import Counter
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (
+    f1_score,
+    hamming_loss,
+    classification_report,
+)
+
+from preprocess import preprocess_dataframe
+
+# ─── Configuration ────────────────────────────────────────────────────────────
+DATA_PATH    = '../data/raw/dataset.csv'   # ← Update to your CSV path
+MODEL_DIR    = '../models/'
+MODEL_PATH   = os.path.join(MODEL_DIR, 'tag_model.pkl')
+TFIDF_PATH   = os.path.join(MODEL_DIR, 'tfidf.pkl')
+MLB_PATH     = os.path.join(MODEL_DIR, 'mlb.pkl')
+
+TEXT_COL     = 'text'       # Column name for input text in your CSV
+TAG_COL      = 'tags'       # Column name for tags in your CSV
+
+MIN_TAG_FREQ = 10           # Tags appearing fewer times are removed
+MAX_FEATURES = 50_000       # Maximum TF-IDF vocabulary size
+TEST_SIZE    = 0.2          # 20% of data used for evaluation
+RANDOM_STATE = 42           # For reproducibility
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def filter_rare_tags(df: pd.DataFrame, min_freq: int) -> pd.DataFrame:
+    """
+    Remove tags that appear fewer than `min_freq` times across the dataset.
+    Rows that become tag-less after filtering are also removed.
+
+    Args:
+        df (pd.DataFrame): DataFrame with a 'tag_list' column
+        min_freq (int): Minimum number of appearances a tag must have
+
+    Returns:
+        pd.DataFrame: Filtered DataFrame
+    """
+    # Count how many times each tag appears
+    all_tags = [tag for tags in df['tag_list'] for tag in tags]
+    tag_counts = Counter(all_tags)
+
+    # Keep only tags that meet the minimum frequency threshold
+    frequent_tags = {tag for tag, count in tag_counts.items() if count >= min_freq}
+    print(f"  → Tags before filtering: {len(tag_counts)}")
+    print(f"  → Tags after filtering (freq ≥ {min_freq}): {len(frequent_tags)}")
+
+    # Update each row's tag list to only include frequent tags
+    df = df.copy()
+    df['tag_list'] = df['tag_list'].apply(
+        lambda tags: [t for t in tags if t in frequent_tags]
+    )
+
+    # Drop rows that now have no tags
+    df = df[df['tag_list'].map(len) > 0]
+    return df.reset_index(drop=True)
+
+
+def save_artifact(obj, path: str) -> None:
+    """Serialize a Python object to disk using pickle."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'wb') as f:
+        pickle.dump(obj, f)
+    print(f"  → Saved: {path}")
+
+
+def train():
+    """Main training function. Runs the full pipeline end-to-end."""
+
+    print("\n" + "═" * 50)
+    print("   MULTI-CLASS TAG PREDICTOR — TRAINING")
+    print("═" * 50)
+
+    # ── Step 1: Load Data ──────────────────────────────────────────────────────
+    print("\n[1/6] Loading dataset...")
+    df = pd.read_csv(DATA_PATH)
+    print(f"  → Loaded {len(df)} rows from {DATA_PATH}")
+
+    # ── Step 2: Preprocess ────────────────────────────────────────────────────
+    print("\n[2/6] Preprocessing text...")
+    df = preprocess_dataframe(df, text_col=TEXT_COL, tag_col=TAG_COL)
+
+    # ── Step 3: Filter rare tags ──────────────────────────────────────────────
+    print("\n[3/6] Filtering rare tags...")
+    df = filter_rare_tags(df, min_freq=MIN_TAG_FREQ)
+    print(f"  → Final dataset size: {len(df)} rows")
+
+    # ── Step 4: Binarize labels ───────────────────────────────────────────────
+    print("\n[4/6] Binarizing labels...")
+    mlb = MultiLabelBinarizer()
+    y = mlb.fit_transform(df['tag_list'])
+    print(f"  → Number of unique tags (classes): {len(mlb.classes_)}")
+
+    # ── Step 5: TF-IDF Vectorization ─────────────────────────────────────────
+    print("\n[5/6] Vectorizing with TF-IDF...")
+    tfidf = TfidfVectorizer(
+        max_features=MAX_FEATURES,
+        ngram_range=(1, 2),          # Use unigrams and bigrams
+        sublinear_tf=True,           # Apply log normalization to term freq
+        min_df=3,                    # Ignore terms appearing in < 3 docs
+    )
+    X = tfidf.fit_transform(df['clean_text'])
+    print(f"  → Feature matrix shape: {X.shape}")
+
+    # ── Step 6: Train / Evaluate ──────────────────────────────────────────────
+    print("\n[6/6] Training model...")
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE
+    )
+    print(f"  → Train size: {X_train.shape[0]}  |  Test size: {X_test.shape[0]}")
+
+    # OneVsRestClassifier trains one binary classifier per tag
+    model = OneVsRestClassifier(
+        LogisticRegression(max_iter=500, C=1.0, solver='lbfgs'),
+        n_jobs=-1   # Use all CPU cores
+    )
+    model.fit(X_train, y_train)
+
+    # ── Evaluation ────────────────────────────────────────────────────────────
+    print("\n" + "─" * 50)
+    print("   EVALUATION RESULTS")
+    print("─" * 50)
+    y_pred = model.predict(X_test)
+
+    print(f"  F1 Score  (micro) : {f1_score(y_test, y_pred, average='micro'):.4f}")
+    print(f"  F1 Score  (macro) : {f1_score(y_test, y_pred, average='macro'):.4f}")
+    print(f"  F1 Score (samples): {f1_score(y_test, y_pred, average='samples'):.4f}")
+    print(f"  Hamming Loss      : {hamming_loss(y_test, y_pred):.6f}")
+
+    # ── Save Artifacts ────────────────────────────────────────────────────────
+    print("\n" + "─" * 50)
+    print("   SAVING ARTIFACTS")
+    print("─" * 50)
+    save_artifact(model, MODEL_PATH)
+    save_artifact(tfidf, TFIDF_PATH)
+    save_artifact(mlb,   MLB_PATH)
+
+    print("\n✅ Training complete!\n")
+
+
+if __name__ == '__main__':
+    train()
+    
