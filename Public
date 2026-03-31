@@ -1,0 +1,8 @@
+Project structure uses 
+multi-class-tag-predictor/
+├── data/        → datasets
+├── models/      → saved ML models
+├── notebooks/   → Jupyter experiments
+├── src/         → Python code
+├── assets/      → screenshots for README
+└── app.py       → Streamlit app
