@@ -1,0 +1,5 @@
+src/
+├── preprocess.py   → Cleans text
+├── train.py        → Trains the model
+├── predict.py      → Predicts tags
+├── evaluate.py     → Checks accuracy
